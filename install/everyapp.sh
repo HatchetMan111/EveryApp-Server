@@ -458,15 +458,19 @@ while true; do
   ============================================================
    EveryApp CLI  -  https://github.com/every-app/every-app
   ============================================================
-   Naechste Schritte:
-     everyapp login                           (Cloudflare-Anmeldung)
-     everyapp setup --domain apps.DEINE-DOMAIN.de
-     everyapp install https://github.com/every-app/open-seo
-     everyapp status
+   Schritt 1:  everyapp login
+               -> druckt eine Device-URL + Code: die URL AUF DEINEM
+                  PC im Browser oeffnen, bei Cloudflare einloggen
+   Schritt 2:  everyapp setup --domain apps.DEINE-DOMAIN.de
+               (VORHER im Cloudflare-Dashboard: Workers Paid
+                aktivieren + R2 aktivieren - sonst stoppt setup)
+   Schritt 3:  everyapp install https://github.com/every-app/open-seo
+   Schritt 4:  Die von der CLI gedruckte App-URL im Browser
+               oeffnen -> das ist die Web-UI der App; sie laeuft
+               bei Cloudflare (https://<app>.apps.deine-domain.de)
 
-   Hinweis: Apps laufen in DEINEM Cloudflare-Account
-   (Workers Paid ab ~5 USD/Monat, R2-Pflicht).
-   Telemetrie aus:  everyapp telemetry off
+   Kontrolle:   everyapp status
+   Telemetrie:  everyapp telemetry off
   ============================================================
 
 EOBANNER

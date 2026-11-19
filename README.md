@@ -76,21 +76,41 @@ Erwartete Ausgabe am Ende:
    ...
 ```
 
-## Danach (im Webterminal unter `http://<CT-IP>:8093`)
+## Erste Schritte — Schritt für Schritt
 
-```bash
-everyapp login                              # Cloudflare-Anmeldung
-everyapp setup --domain apps.deine-domain.de
-everyapp install https://github.com/every-app/open-seo
-everyapp status
-```
+> Die Installation selbst erzeugt **nur die Steuerzentrale** (CLI + Webterminal im LXC) —
+> das ist so gemeint. Die sichtbaren App-Oberflächen entstehen erst in den Schritten unten,
+> und zwar **bei Cloudflare unter deiner eigenen Domain**.
 
-Nach `setup`/`install` zeigt die CLI die fertigen App-Hostnames (unter deiner
-Cloudflare-Domain) — **die App-Web-UIs öffnest du dann im Browser bei Cloudflare**, z. B.
-`https://open-seo.apps.deine-domain.de`. Im Webterminal/LXC selbst gibt es nur die CLI
-(plus dieses Terminal als lokale „Fernbedienung“).
+### Voraussetzungen (Cloudflare, einmalig — vor Schritt 2)
 
-Telemetrie abschalten (tägl. anonymer Usage-Report): `everyapp telemetry off`
+1. **Cloudflare-Account** (kostenlos)
+2. **Deine Domain bei Cloudflare** (Nameserver auf Cloudflare umgestellt; Free-Plan reicht)
+3. **Workers Paid** aktivieren: Dashboard → Workers & Pages → Plan → *Workers Paid* (~5 USD/Monat)
+4. **R2 aktivieren**: Dashboard → R2 → aktivieren (Payment-Info nötig; 10 GB inklusive).
+   Ohne R2 stoppt `setup` mit `enable_r2` + Dashboard-Link.
+
+### Im Webterminal (Browser: `http://<CT-IP>:8093`)
+
+| Schritt | Befehl | Was passiert |
+|---|---|---|
+| 1 | `everyapp login` | CLI druckt eine **Device-URL + Code** → URL **auf deinem Desktop** im Browser öffnen, Cloudflare-Login bestätigen. Zurück im Terminal: `✓ Logged in`. |
+| 2 | `everyapp setup --domain apps.deine-domain.de` | Deployt das Gateway in deinen Account (Worker, D1, KV, R2, Migrationen) — dauert laut Projekt ~15 min. Bei Fehlern druckt die CLI den Fix-Befehl direkt mit. |
+| 3 | `everyapp install https://github.com/every-app/open-seo` | Installiert eine App (OpenSEO/OpenCRM/OpenAnalytics/OpenMail). Die CLI druckt die fertige **App-URL**. |
+| 4 | App-URL im Browser öffnen | Die **echte Web-UI** der App — Anmeldung läuft über das Gateway (Cloudflare Access). |
+| 5 | `everyapp status` | Kontrolle: Gateway, Apps, Login-Status. |
+| 6 | optional: `everyapp mcp` | MCP-Server-Verbindung für deinen KI-Agenten (Claude Code, Codex …) — ein Endpoint für alle Apps. |
+
+Telemetrie abschalten (tägl. anonymer Usage-Report): `everyapp telemetry off` (oder bei
+`setup` gleich `--no-telemetry` mitgeben).
+
+### Wo sehe ich was?
+
+- **LXC-IP:8093** = Webterminal (schwarzes Fenster, CLI-Banner) — die „Fernbedienung“
+- **`https://<app>.apps.deine-domain.de`** (bei Cloudflare) = die eigentlichen App-Web-UIs
+- Auf der Proxmox-IP selbst läuft bewusst **keine** App-UI — die Apps sind Cloudflare-Workers
+
+## Optionen
 
 ## Optionen
 
