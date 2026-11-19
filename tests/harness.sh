@@ -23,8 +23,9 @@ VERBOSE=0
 [[ "${1:-}" == "-v" ]] && VERBOSE=1
 
 WORK="$(mktemp -d /tmp/everyapp-harness.XXXXXX)"
-FAKEBIN="$WORK/fakebin"
-mkdir -p "$FAKEBIN"
+FAKEBIN="$WORK/fakebin"        # Host-Ebene: pct/pvesh/pveam/pvesm/pveversion/wget
+FAKEBIN_CT="$WORK/fakebin-ct"  # CT-Innen-Ebene: simuliert /usr/bin:/bin im LXC
+mkdir -p "$FAKEBIN" "$FAKEBIN_CT"
 PASS=0
 FAIL=0
 FAILED_CASES=()
@@ -47,10 +48,15 @@ fi
 # ------------------------------------------------------------------------------
 # Mocks
 # ------------------------------------------------------------------------------
-mock() { # mock <name> <<'EOF' ... EOF
+mock() { # mock <name> <<'EOF' ... EOF  -> Host-Ebene
   local name="$1"
   cat > "$FAKEBIN/$name"
   chmod 0755 "$FAKEBIN/$name"
+}
+mock_ct() { # mock_ct <name> <<'EOF' ... EOF -> CT-Innen-Ebene (/usr/bin-Simulation)
+  local name="$1"
+  cat > "$FAKEBIN_CT/$name"
+  chmod 0755 "$FAKEBIN_CT/$name"
 }
 
 mock pveversion <<'EOF'
@@ -239,20 +245,22 @@ case "$sub" in
           -e "s|/var/log/|@@EVROOT@@/var/log/|g" \
           -e "s|@@EVROOT@@|$ROOT|g"
     }
+    # lxc-attach-Realismus: innerer PATH ist $(getconf PATH) = /bin:/usr/bin
+    # (fakebin-ct simuliert die CT-/usr/bin-Mocks; /usr/local/bin fehlt bewusst)
     if [[ "${rest[0]:-}" == "bash" && "${rest[1]:-}" == "-s" ]]; then
       script="$(cat | rw)"
-      exec env "${pre[@]}" bash -c "$script"
+      exec env PATH="$FAKEBIN_CT:/usr/bin:/bin" "${pre[@]}" bash -c "$script"
     elif [[ "${rest[0]:-}" == "bash" && "${rest[1]:-}" == "-c" ]]; then
       script="$(printf '%s' "${rest[2]:-}" | rw)"
-      exec env "${pre[@]}" bash -c "$script"
+      exec env PATH="$FAKEBIN_CT:/usr/bin:/bin" "${pre[@]}" bash -c "$script"
     else
-      exec env "${pre[@]}" "${rest[@]}"
+      exec env PATH="$FAKEBIN_CT:/usr/bin:/bin" "${pre[@]}" "${rest[@]}"
     fi ;;
   *) echo "pct: unknown sub $sub" >&2; exit 1 ;;
 esac
 EOF
 
-mock apt-get <<'EOF'
+mock_ct apt-get <<'EOF'
 #!/usr/bin/env bash
 STATE="$HARNESS_STATE"
 sub="${1:-}"; shift || true
@@ -273,7 +281,7 @@ case "$sub" in
 esac
 EOF
 
-mock node <<'EOF'
+mock_ct node <<'EOF'
 #!/usr/bin/env bash
 have="${NODE_MOCK_VERSION:-22.21.0}"
 if [[ "${1:-}" == "-e" ]]; then
@@ -297,7 +305,7 @@ if [[ "${1:-}" == "--version" ]]; then echo "v$have"; exit 0; fi
 exit 0
 EOF
 
-mock npm <<'EOF'
+mock_ct npm <<'EOF'
 #!/usr/bin/env bash
 STATE="$HARNESS_STATE"
 sub="${1:-}"; shift || true
@@ -314,7 +322,7 @@ case "$sub" in
 esac
 EOF
 
-mock everyapp <<'EOF'
+mock_ct everyapp <<'EOF'
 #!/usr/bin/env bash
 STATE="$HARNESS_STATE"
 if [[ ! -f "$STATE/npm.installed.everyapp" ]]; then
@@ -327,15 +335,7 @@ case "${1:-}" in
 esac
 EOF
 
-mock ttyd <<'EOF'
-#!/usr/bin/env bash
-case "${1:-}" in
-  --version) echo "ttyd version 1.7.7 (mock)"; exit 0 ;;
-  *) exit 0 ;;
-esac
-EOF
-
-mock systemctl <<'EOF'
+mock_ct systemctl <<'EOF'
 #!/usr/bin/env bash
 STATE="$HARNESS_STATE"
 ROOT="$HARNESS_ROOT"
@@ -373,13 +373,13 @@ case "$sub" in
 esac
 EOF
 
-mock journalctl <<'EOF'
+mock_ct journalctl <<'EOF'
 #!/usr/bin/env bash
 echo "MOCK-JOURNAL-OUTPUT: everyapp-ttyd mock log lines"
 exit 0
 EOF
 
-mock tmux <<'EOF'
+mock_ct tmux <<'EOF'
 #!/usr/bin/env bash
 STATE="$HARNESS_STATE"
 sub="${1:-}"; shift || true
@@ -397,7 +397,7 @@ case "$sub" in
 esac
 EOF
 
-mock curl <<'EOF'
+mock_ct curl <<'EOF'
 #!/usr/bin/env bash
 STATE="$HARNESS_STATE"
 outfile=""; url=""
@@ -456,7 +456,7 @@ echo "mock-curl-body"
 exit 0
 EOF
 
-mock hostname <<'EOF'
+mock_ct hostname <<'EOF'
 #!/usr/bin/env bash
 case "${1:-}" in
   -I)
@@ -466,7 +466,7 @@ case "${1:-}" in
 esac
 EOF
 
-mock getent <<'EOF'
+mock_ct getent <<'EOF'
 #!/usr/bin/env bash
 sub="${1:-}"; shift || true
 case "$sub" in
@@ -484,7 +484,7 @@ case "$sub" in
 esac
 EOF
 
-mock runuser <<'EOF'
+mock_ct runuser <<'EOF'
 #!/usr/bin/env bash
 # runuser -u <user> -- cmd ...
 if [[ "${1:-}" == "-u" ]]; then shift 2; fi
@@ -566,14 +566,14 @@ run_install() { # run_install <script-args...>  (env: CASE_ENV, stdin: STDIN_TEX
   if [[ -n "$STDIN_TEXT" ]]; then
     ( cd "$OUT" && printf '%s\n' "$STDIN_TEXT" | env -i \
         PATH="$FAKEBIN:/usr/bin:/bin" \
-        HARNESS_STATE="$STATE" HARNESS_ROOT="$R" LOG_FILE="$LOG" \
+        HARNESS_STATE="$STATE" HARNESS_ROOT="$R" LOG_FILE="$LOG" FAKEBIN_CT="$FAKEBIN_CT" \
         "${CASE_ENV[@]}" \
         unshare -r --map-root-user bash "$SCRIPT" ${args[@]+"${args[@]}"} \
         > "$OUT/out.txt" 2> "$OUT/err.txt" )
   else
     ( cd "$OUT" && env -i \
         PATH="$FAKEBIN:/usr/bin:/bin" \
-        HARNESS_STATE="$STATE" HARNESS_ROOT="$R" LOG_FILE="$LOG" \
+        HARNESS_STATE="$STATE" HARNESS_ROOT="$R" LOG_FILE="$LOG" FAKEBIN_CT="$FAKEBIN_CT" \
         "${CASE_ENV[@]}" \
         unshare -r --map-root-user bash "$SCRIPT" ${args[@]+"${args[@]}"} \
         > "$OUT/out.txt" 2> "$OUT/err.txt" )

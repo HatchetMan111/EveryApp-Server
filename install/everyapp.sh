@@ -257,7 +257,9 @@ if [[ "$MODE" == "update" ]]; then
       exit 1
     fi
     chmod 0755 /tmp/ttyd && mv /tmp/ttyd /usr/local/bin/ttyd
-    ttyd --version
+    # /usr/local/bin ist bei pct exec NICHT im PATH (lxc-attach startet mit
+    # PATH=$(getconf PATH) = /bin:/usr/bin) -> absolut + nur test -x
+    test -x /usr/local/bin/ttyd
 EOTTYDUPD
   run_capture pct exec "$CT_ID" -- systemctl restart everyapp-ttyd \
     || die $? "Update/systemd" "Restart von everyapp-ttyd fehlgeschlagen."
@@ -432,7 +434,10 @@ if [[ "$magic" != "f0VMRg==" ]]; then
   exit 1
 fi
 chmod 0755 /tmp/ttyd && mv /tmp/ttyd /usr/local/bin/ttyd
-ttyd --version
+# /usr/local/bin ist bei pct exec NICHT im PATH (lxc-attach startet mit
+# PATH=$(getconf PATH) = /bin:/usr/bin) -> absolut + nur test -x;
+# der eigentliche Beweis ist der Service-Start + HTTP-Check in der Verifikation.
+test -x /usr/local/bin/ttyd
 EOTTYD
 ok "ttyd installiert."
 
