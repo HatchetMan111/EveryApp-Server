@@ -9,6 +9,44 @@ Ein-Command-Installer für die **EveryApp-CLI** ([every-app/every-app](https://g
 > **Lokal** auf deinem Proxmox läuft die `everyapp`-CLI plus ein Webterminal, mit dem du das
 > Cloudflare-Setup im Container durchführst.
 
+## Was ist EveryApp?
+
+EveryApp ([every-app/every-app](https://github.com/every-app/every-app), MIT, ~1k ⭐) ist eine
+Plattform für **Open-Source-Alternativen zu bezahlten SaaS-Diensten** — „Open source
+alternatives to everything". Statt einen CRM-, SEO- oder Analytics-Abodienst zu mieten,
+installierst du die offenen Apps in **deinen eigenen Cloudflare-Account**:
+
+| App | Ersetzt sinngemäß | Was es macht |
+|---|---|---|
+| **OpenSEO** | Ahrefs/Semrush-Lite | Keyword-Recherche, Rank-Tracking, Site-Audits |
+| **OpenCRM** | HubSpot/Pipedrive-Lite | einfaches CRM mit Kontakten & Deals |
+| **OpenAnalytics** | Google Analytics | Web-Analytics ohne Cookies/Tracking |
+| **OpenMail** | kostenl. Mail-Clients | E-Mail-Postfach mit KI-Assistent |
+| **OpenScribe** | Otter/Fireflies | KI-Meeting-Notizen (Mac-Desktop-App) |
+
+„Selbst hosten" heißt bei EveryApp: **einmal `everyapp setup`, und die Plattform wird in
+deinen Cloudflare-Account deployed** (Workers + D1 + KV + R2). Du zahlst keine Sitzplatzpreise,
+sondern deine eigene Cloudflare-Rechnung (Workers Paid ab ~5 USD/Monat); die Daten liegen in
+deinem Account. Ein KI-Agent (Claude Code, Codex …) bekommt über **einen einzigen MCP-Server**
+Zugriff auf alle Apps gleichzeitig — das ist der eigentliche Kern des Projekts.
+
+## Wo läuft die Weboberfläche — und was ist hier lokal?
+
+**Die Apps haben echte Weboberflächen — sie laufen aber bei Cloudflare, nicht im LXC:**
+
+| Ebene | Was | Wo erreichbar |
+|---|---|---|
+| **Apps** (OpenSEO, OpenCRM …) | vollwertige Web-UIs im Browser | `https://<app>.<deine-domain>` **bei Cloudflare** — nach `everyapp setup` |
+| **Gateway** | Anmeldung/Consent für Apps & Agent-Zugriff (Cloudflare Access) | ebenfalls unter deiner Domain, bei Cloudflare |
+| **CLI** (`everyapp`) | Fernbedienung: `setup`, `install`, `deploy`, `status`, `db`, `secret` | **lokal im LXC** (dieser Installer) |
+| **Webterminal** (ttyd, Port 8093) | lokale Browser-Oberfläche für die CLI im Container | `http://<CT-IP>:8093` — das ist die „UI", die dieser Installer bereitstellt |
+
+Der Workflow ist also: im **Webterminal auf deinem Proxmox** die CLI bedienen (`everyapp
+install https://github.com/every-app/open-seo` …) — und die App-UIs danach im Browser unter
+deiner Cloudflare-Domain öffnen. Eine lokale App-Weboberfläche auf einer Proxmox-IP gibt es
+nicht, weil die Apps als Cloudflare-Workers bauen sind (das Projekt hat keinen lokalen
+Server-Modus; nur ein experimenteller `everyapp dev`-Modus ohne Gateway/Multi-User).
+
 ## Installation (Einzeiler, auf dem Proxmox-Host als root)
 
 ```bash
@@ -46,6 +84,11 @@ everyapp setup --domain apps.deine-domain.de
 everyapp install https://github.com/every-app/open-seo
 everyapp status
 ```
+
+Nach `setup`/`install` zeigt die CLI die fertigen App-Hostnames (unter deiner
+Cloudflare-Domain) — **die App-Web-UIs öffnest du dann im Browser bei Cloudflare**, z. B.
+`https://open-seo.apps.deine-domain.de`. Im Webterminal/LXC selbst gibt es nur die CLI
+(plus dieses Terminal als lokale „Fernbedienung“).
 
 Telemetrie abschalten (tägl. anonymer Usage-Report): `everyapp telemetry off`
 
